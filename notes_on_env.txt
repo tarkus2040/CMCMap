@@ -1,9 +1,0 @@
-conda create -n CMCMap python=3.10
-conda activate CMCMap
-
-pip install causal-learn
-conda install scikit-learn scipy pandas graphviz seaborn
-pip install tigramite
-
-pip install numpy==1.23.5
-pip install cauaslnex
