@@ -13,7 +13,7 @@ from utils.causal_simplex import PCM_simplex
 import argparse
 parser = argparse.ArgumentParser("single experiment of PCM on synthetic data")
 parser.add_argument('--data_dir', type=str, default='data_files/data/gen')
-parser.add_argument('--causality_type', type=str, default='3V_direct', help='Options: 3V_direct, 3V_indirect, 3V_both_Cycle, 3V_both_noCycle, 4V_direct, 4V_indirect, 4V_both_Cycle, 4V_both_noCycle')
+parser.add_argument('--causality_type', type=str, default='3V_direct_CMC', help='Options: 3V_direct, 3V_indirect, 3V_both_Cycle, 3V_both_noCycle, 4V_direct, 4V_indirect, 4V_both_Cycle, 4V_both_noCycle')
 
 parser.add_argument('--seed', type=int, default=97, help='random seed, for sampling a random start point for input time series')
 
@@ -31,10 +31,19 @@ parser.add_argument('--score_type', type=str, default='corr', help="Options are 
 parser.add_argument('--pcm_thres', type=float, default=0.45, help="Threshold for PCM")
 
 # name of cause and effect (each is single variable, the rest are all treated as conditions)
-parser.add_argument('--cause', type=str, default='X')
-parser.add_argument('--effect', type=str, default='Y')
+parser.add_argument('--cause', type=str, default='Y')
+parser.add_argument('--effect', type=str, default='Z')
 
 args=parser.parse_args()
+
+def determine_condition(output, score_type, threshold):
+    ratio_index = {'err': 2, 'corr': 5, 'r2': 8}[score_type]
+    ratio = output[ratio_index]
+    if 0.95 < ratio < 1.05:
+        return 0
+    if score_type == 'err':
+        return int(ratio >= threshold)
+    return int(ratio <= threshold)
 
 # set seeds
 seed=args.seed
@@ -84,51 +93,68 @@ for file_name in file_names:
 
     # get the name lists of cause, effect and condition
     var_list = df.columns
-    list_cause=[args.cause]
-    list_effect=[args.effect]
     list_conditions=[var for var in var_list if var!=args.cause and var!=args.effect]
 
-    pcm=PCM_simplex(df=df, causes=list_cause, effects=list_effect, cond=list_conditions, tau=args.tau, emd=args.emd, L=args.L, knn=args.knn)
-    output=pcm.causality() # order: sc1_error, sc2_error, ratio_error, sc1_corr, sc2_corr, ratio_corr, sc1_r2, sc2_r2, ratio_r2
-
-    del pcm
+    outputs = []
+    for cause, effect in [(args.cause, args.effect), (args.effect, args.cause)]:
+        pcm=PCM_simplex(
+            df=df,
+            causes=[cause],
+            effects=[effect],
+            cond=list_conditions,
+            tau=args.tau,
+            emd=args.emd,
+            L=args.L,
+            knn=args.knn,
+        )
+        outputs.append(pcm.causality())
+        del pcm
 
     # (threshold independent) save all outputs first as text
     file_save_name=file_name+f'_L{args.L}__tau{args.tau}_emd{args.emd}_knn{args.knn}_pcmThres{args.pcm_thres}'
+    metric_index = {'err': 0, 'corr': 3, 'r2': 6}[args.score_type]
+    metric_name = {'err': 'Error', 'corr': 'Correlation', 'r2': 'R2'}[args.score_type]
+    result_indices = [determine_condition(output, args.score_type, args.pcm_thres) for output in outputs]
+    conclusions = [
+        'The other variables are condition.' if result_idx else 'The other variables are not condition.'
+        for result_idx in result_indices
+    ]
+
     with open(os.path.join(save_dir, file_save_name+'_output.txt'), 'w') as f:
-        f.write('sc1_error, sc2_error, ratio_error, sc1_corr, sc2_corr, ratio_corr, sc1_r2, sc2_r2, ratio_r2\n')
-        f.write(','.join([str(x) for x in output])+'\n\n')
-    np.save(os.path.join(save_dir, file_save_name+'_output.npy'), output)
+        f.write(f'Dataset: {file_name}\n')
+        f.write(f'Variables: {", ".join(var_list)}\n')
+        f.write(f'Condition variables: {", ".join(list_conditions)}\n')
+        f.write(f'Score type: {args.score_type}  Threshold: {args.pcm_thres}\n\n')
+        f.write(f'{"Direction":<20} {"Direct":>14} {"Conditioned":>14} {"Ratio":>14}  Conclusion\n')
+        for (cause, effect), output, conclusion in zip(
+            [(args.cause, args.effect), (args.effect, args.cause)], outputs, conclusions
+        ):
+            f.write(
+                f'{cause + " -> " + effect:<20} {output[metric_index]:>14.6g} '
+                f'{output[metric_index + 1]:>14.6g} {output[metric_index + 2]:>14.6g}  '
+                f'{conclusion}\n'
+            )
+    np.save(os.path.join(save_dir, file_save_name+'_output.npy'), outputs[0])
+    np.save(os.path.join(save_dir, file_save_name+'_reverse_output.npy'), outputs[1])
 
-
-
-
-    # then (threshold dependent), depend on the score type and threshold, determine the causality
-    if args.score_type=='err':
-        if output[2]>0.95 and output[2]<1.05: # ratio of indirectError over directError close enough
-            # then likely the other variables are not condition
-            result_idx=0 # means "not condition"
-        else: # then compare with threshold
-            if output[2]>=args.pcm_thres: # ratio of indirectError over directError is significantly increased, then likely the other variables are condition
-                result_idx=1 # means "condition"
-            else:
-                result_idx=0
-
-    elif args.score_type=='corr' or args.score_type=='r2':
-        if output[5]>0.95 and output[5]<1.05:
-            result_idx=0
-        else:
-            if output[5]<=args.pcm_thres: # if the correlation ratio is significantly decreased, then likely the other variables are condition
-                result_idx=1
-            else:
-                result_idx=0
-
-    # print the result statement to the text file
     with open(os.path.join(save_dir, file_save_name+'_conclus.txt'), 'w') as f:
-        if result_idx==0:
-            f.write('The other variables are not condition.\n')
-        else:
-            f.write('The other variables are condition.\n')
+        for (cause, effect), conclusion in zip(
+            [(args.cause, args.effect), (args.effect, args.cause)], conclusions
+        ):
+            f.write(f'{cause} -> {effect}: {conclusion}\n')
 
-    # save the index of the result
-    np.save(os.path.join(save_dir, file_save_name+'_result_idx.npy'), result_idx)
+    np.save(os.path.join(save_dir, file_save_name+'_result_idx.npy'), result_indices[0])
+    np.save(os.path.join(save_dir, file_save_name+'_reverse_result_idx.npy'), result_indices[1])
+
+    print(f'\nデータ: {file_name}')
+    print(f'指標: {metric_name}  しきい値: {args.pcm_thres}')
+    print(f'{"方向":<12} {"直接":>14} {"条件付き":>14} {"比率":>14}')
+    for (cause, effect), output, result_idx in zip(
+        [(args.cause, args.effect), (args.effect, args.cause)], outputs, result_indices
+    ):
+        print(
+            f'{cause} -> {effect:<7} {output[metric_index]:>14.6g} '
+            f'{output[metric_index + 1]:>14.6g} {output[metric_index + 2]:>14.6g}'
+        )
+        print(f'  判定: {"他の変数は条件" if result_idx else "他の変数は条件ではない"}')
+    print(f'保存先: {os.path.join(save_dir, file_save_name)}')

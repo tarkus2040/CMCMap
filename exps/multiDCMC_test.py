@@ -14,7 +14,7 @@ from utils.causal_simplex import DCMC_simplex
 import argparse
 parser = argparse.ArgumentParser("single experiment of DCMC on synthetic data")
 parser.add_argument('--data_dir', type=str, default='data_files/data/gen')
-parser.add_argument('--causality_type', type=str, default='3V_direct', help='Options: 3V_direct, 3V_indirect, 3V_both_Cycle, 3V_both_noCycle, 4V_direct, 4V_indirect, 4V_both_Cycle, 4V_both_noCycle')
+parser.add_argument('--causality_type', type=str, default='3V_direct_CMC', help='Options: 3V_direct, 3V_indirect, 3V_both_Cycle, 3V_both_noCycle, 4V_direct, 4V_indirect, 4V_both_Cycle, 4V_both_noCycle')
 
 parser.add_argument('--seed', type=int, default=97, help='random seed, for sampling a random start point for input time series')
 
@@ -31,7 +31,7 @@ parser.add_argument('--knn', type=int, default=4, help="Number of nearest neighb
 parser.add_argument('--dcmc_thres', type=float, default=0.5, help="Threshold for direct causality score")
 
 # name of cause and effect (each is single variable, the rest are all treated as conditions)
-parser.add_argument('--cause', type=str, default='X')
+parser.add_argument('--cause', type=str, default='Y')
 parser.add_argument('--effect', type=str, default='Z')
 
 args=parser.parse_args()
@@ -92,9 +92,15 @@ for file_name in file_names:
 
     # save all outputs first as text
     file_save_name=file_name+f'_L{args.L}__tau{args.tau}_emd{args.emd}_knn{args.knn}_dcmcThres{args.dcmc_thres}'
+    cause_to_effect = f'{args.cause} -> {args.effect}'
+    effect_to_cause = f'{args.effect} -> {args.cause}'
     with open(os.path.join(save_dir, file_save_name+'_output.txt'), 'w') as f:
-        f.write('dir_score_c2e, dir_score_e2c, cmc_score_c2e, cmc_score_e2c\n')
-        f.write(','.join([str(x) for x in output])+'\n\n')
+        f.write(f'Dataset: {file_name}\n')
+        f.write(f'Cause: {args.cause}  Effect: {args.effect}\n')
+        f.write(f'Direct causality threshold: {args.dcmc_thres}\n\n')
+        f.write(f'{"Score":<28} {cause_to_effect:>16} {effect_to_cause:>16}\n')
+        f.write(f'{"Direct causality (DCMC)":<28} {output[0]:>16.6g} {output[1]:>16.6g}\n')
+        f.write(f'{"Cross mapping (CMC)":<28} {output[2]:>16.6g} {output[3]:>16.6g}\n')
     np.save(os.path.join(save_dir, file_save_name+'_output.npy'), output)
 
 
@@ -104,16 +110,19 @@ for file_name in file_names:
 
     if dir_score_c2e >= args.dcmc_thres and dir_score_e2c < args.dcmc_thres:
         result_idx = 1
-        msg = 'Direct causality detected: Cause -> Effect.\n'
+        msg = f'直接因果を検出: {cause_to_effect}\n'
     elif dir_score_e2c >= args.dcmc_thres and dir_score_c2e < args.dcmc_thres:
         result_idx = 2
-        msg = 'Direct causality detected: Effect -> Cause.\n'
+        msg = f'直接因果を検出: {effect_to_cause}\n'
     elif dir_score_c2e >= args.dcmc_thres and dir_score_e2c >= args.dcmc_thres:
         result_idx = 3
-        msg = 'Bidirectional direct causality detected.\n'
+        msg = f'双方向の直接因果を検出: {args.cause} <-> {args.effect}\n'
     else:
         result_idx = 0
-        msg = 'No direct causality detected.\n'
+        msg = '直接因果は検出されませんでした。\n'
+
+    with open(os.path.join(save_dir, file_save_name+'_output.txt'), 'a') as f:
+        f.write(f'\nConclusion: {msg}')
 
     # print the result statement to the text file
     with open(os.path.join(save_dir, file_save_name+'_conclus.txt'), 'w') as f:
@@ -121,3 +130,10 @@ for file_name in file_names:
 
     # save the index of the result
     np.save(os.path.join(save_dir, file_save_name+'_result_idx.npy'), result_idx)
+
+    print(f'\nデータ: {file_name}')
+    print(f'{"スコア":<24} {cause_to_effect:>16} {effect_to_cause:>16}')
+    print(f'{"直接因果 (DCMC)":<24} {output[0]:>16.6g} {output[1]:>16.6g}')
+    print(f'{"クロスマッピング (CMC)":<24} {output[2]:>16.6g} {output[3]:>16.6g}')
+    print(f'判定: {msg.strip()}')
+    print(f'保存先: {os.path.join(save_dir, file_save_name)}')
