@@ -31,8 +31,8 @@ parser.add_argument('--knn', type=int, default=4, help="Number of nearest neighb
 parser.add_argument('--dcmc_thres', type=float, default=0.5, help="Threshold for direct causality score")
 
 # name of cause and effect (each is single variable, the rest are all treated as conditions)
-parser.add_argument('--cause', type=str, default='Y')
-parser.add_argument('--effect', type=str, default='Z')
+parser.add_argument('--cause', type=str, default='Z')
+parser.add_argument('--effect', type=str, default='X')
 
 args=parser.parse_args()
 
