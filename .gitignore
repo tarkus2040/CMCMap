@@ -4,3 +4,4 @@ job_scripts
 test_distance.py
 .vscode
 __pycache__
+.png
