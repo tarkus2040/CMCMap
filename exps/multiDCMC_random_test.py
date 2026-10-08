@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(
     "Run DCMC for all variable pairs over random contiguous time-series windows"
 )
 parser.add_argument('--data_dir', type=str, default='data_files/data/gen')
-parser.add_argument('--causality_type', type=str, default='4V_direct_CMC')
+parser.add_argument('--causality_type', type=str, default='6V_both_Cycle')
 parser.add_argument('--seed', type=int, default=97, help='seed used to choose window start indices')
 parser.add_argument('--L', type=int, default=1000, help='length of each input time-series window')
 parser.add_argument('--repeats', type=int, default=5, help='number of random windows per dataset')

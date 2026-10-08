@@ -4,23 +4,23 @@ import numpy as np
 
 import graphviz
 
-from utils.data_utils import time_delay_embed
 from utils.causal_simplex import CMC_simplex, DCMC_simplex
 
 class CMCMap:
 
-    def __init__(self, df, score_type='corr', tau=2, emd=8, dcmc_thres=0.5, **kwargs):
+    def __init__(self, df, tau=2, emd=8, bivCMC_thres=0.5, dcmc_thres=0.5, **kwargs):
         
         self.df = df # the dataframe, extract the column names or indices, determine the causal graph
         self.kwargs = kwargs # dictionary of other parameters, including the CMC and DCMC parameters
         
-        if score_type not in ['corr', 'err', 'r2']:
-            raise ValueError('score_type must be either "corr" or "err" or "r2"')
-        self.score_type = score_type
-
         self.tau = tau # time delay for time delay embedding
         self.emd = emd
 
+        if not 0 <= bivCMC_thres <= 1:
+            raise ValueError('bivCMC_thres must be between 0 and 1')
+        if not 0 <= dcmc_thres <= 1:
+            raise ValueError('dcmc_thres must be between 0 and 1')
+        self.bivCMC_thres = bivCMC_thres
         self.dcmc_thres = dcmc_thres # threshold for DCMC edge removal
 
         self.n = df.shape[1] # number of variables
@@ -80,31 +80,35 @@ class CMCMap:
         # initialize adjacency matrix
         self.adj_matrix=np.zeros((self.n,self.n))
 
-        ch={} # dictionary to store the children of each variable
-        
-        sc_ratio_stats={}
-        for i in range(self.n): # cause
+        ch={i: [] for i in range(self.n)} # dictionary to store the children of each variable
+        total_pairs = self.n * (self.n - 1) // 2
+        pair_index = 0
+        print(f'[CMC] Evaluating {total_pairs} variable pairs.', flush=True)
 
-            # initialize children of current var
-            ch[i]=[]
-            #  store the score stats
-            sc_ratio_stats[i]={}
+        for i in range(self.n): # cause
 
             # do not test redundant pairs
             for j in S[S>i]: # effect
+                pair_index += 1
                 # cross map between the current variable i and the candidate child j
                 # determine whether the edge between i and j is redundant
                 cause_ind=[i]
                 effect_ind=[j]
                 cause_list=self.var_names[cause_ind].tolist()
                 effect_list=self.var_names[effect_ind].tolist()
+                print(
+                    f'[CMC] {pair_index}/{total_pairs}: '
+                    f'{cause_list[0]} -> {effect_list[0]} / '
+                    f'{effect_list[0]} -> {cause_list[0]}',
+                    flush=True,
+                )
 
                 # key in dictionary to store the stats ("cause -> effect | conds")
                 phase1_stats_key=f'causes_{cause_ind} -> effect_{effect_ind}'
 
                 # create the CMC_simplex object
                 cm=CMC_simplex(self.df,cause_list,effect_list,self.tau,self.emd,**self.kwargs)
-                output=cm.causality() # order: sc1_err, sc2_err, sc1_corr, sc2_corr, sc1_r2, sc2_r2
+                output=cm.causality() # CMC scores: cause -> effect, effect -> cause
 
 
                 del cm
@@ -112,65 +116,40 @@ class CMCMap:
                 # store the stats
                 self.phase1_stats[phase1_stats_key] = output
 
-                if self.score_type=='err': 
-                    ratio=output[0]/output[1]
-                if self.score_type=='corr':
-                    ratio=output[2]/output[3]
-                if self.score_type=='r2':
-                    ratio=output[4]/output[5]
+                score_c2e, score_e2c = output
+                if max(score_c2e, score_e2c) < self.bivCMC_thres:
+                    continue
+                if score_c2e > score_e2c:
+                    ch[i].append(j)
+                    self.adj_matrix[i,j]=1
+                elif score_e2c > score_c2e:
+                    ch[j].append(i)
+                    self.adj_matrix[j,i]=1
 
-                # store the ratio
-                sc_ratio_stats[i][j]=ratio
-
-        # link all the variable pairs if the ratio is greater than 1 (corr, r1) or smaller than 1 (err)
-        for i in range(self.n):
-            if self.score_type=='err':
-                for j in S[S>i]:
-                    if sc_ratio_stats[i][j]<1:
-                        ch[i].append(j)
-                        self.adj_matrix[i,j]=1
-                    else:
-                        ch[j].append(i)
-                        self.adj_matrix[j,i]=1
-            else: # if corr or r2
-                for j in S[S>i]:
-                    # access output from phase1 stats
-                    output=self.phase1_stats[f'causes_{[i]} -> effect_{[j]}']
-                    if sc_ratio_stats[i][j]>1:
-                        # condition for not establishing the edge, if the score (corr or r2) is too small
-                        if self.score_type=='corr':
-                            if output[2]<0.5 and output[3]<0.5:
-                                continue
-                        if self.score_type=='r2':
-                            if output[4]<0.5 and output[5]<0.5:
-                                continue
-                        ch[i].append(j)
-                        self.adj_matrix[i,j]=1
-                    else:
-                        ch[j].append(i)
-                        if self.score_type=='corr':
-                            if output[2]<0.5 and output[3]<0.5:
-                                continue
-                        if self.score_type=='r2':
-                            if output[4]<0.5 and output[5]<0.5:
-                                continue
-                        self.adj_matrix[j,i]=1
-
+        print('[CMC] Pairwise evaluation complete.', flush=True)
         return ch     
                 
         
     def _eliminate_edges(self, ch):
         """ The second step: eliminate redundant edges.
-        Use the score_type to determine which returned scores from PCM model to use.
         * Note my definition of ordering is from sink to top.
         
         For each pairwise edge that has other variables in between, this might be indirecto causality"""
 
-        # Multi PCM
+        # MultiDCMC
         list_to_remove=[] # will be used to store tuples of edges (cause, effect) to remove
+        total_edges = sum(len(children) for children in ch.values())
+        edge_index = 0
+        print(f'[multiDCMC] Checking {total_edges} candidate edges.', flush=True)
 
         for i in range(self.n):
             for j in ch[i]: # children of i
+                edge_index += 1
+                print(
+                    f'[multiDCMC] {edge_index}/{total_edges}: '
+                    f'{self.var_names[i]} -> {self.var_names[j]}',
+                    flush=True,
+                )
                 # check if a causal path (from adjacency matrix) can be established between i and j
                 # if there is a path, do PCM to determine if it is a indirect causation
                     # if it is, remove the edge between i and j
@@ -181,7 +160,7 @@ class CMCMap:
                 bool, list_var_on_path = find_longest_path(self.adj_matrix, i, j)
 
                 if bool:
-                    # create the PCM object
+                    # create the DCMC object
                     # cause_list=self.var_names[[i]].tolist()
                     # effect_list=self.var_names[[j]].tolist()
                     # conds_list=[self.var_names[k] for k in list_var_on_path]
@@ -203,22 +182,15 @@ class CMCMap:
                     phase2_stats_key=f'causes_{cause_ind} -> effect_{effect_ind} | conds_{conds_ind}'
 
                     dcmc=DCMC_simplex(self.df,cause_list,effect_list,conds_list,self.tau,self.emd,**self.kwargs)
-                    output=dcmc.causality() # sc1_error, sc2_error, ratio_error, sc1_corr, sc2_corr, ratio_corr, sc1_r2, sc2_r2, ratio_r2
+                    output=dcmc.causality() # direct scores: cause -> effect, effect -> cause
                     del dcmc
 
                     # store the stats
                     self.phase2_stats[phase2_stats_key] = output
 
 
-                    if self.score_type=='err':
-                        if output[2]>self.dcmc_thres:
-                            list_to_remove.append((i,j))
-                    if self.score_type=='corr':
-                        if output[5]<self.dcmc_thres:
-                            list_to_remove.append((i,j))
-                    if self.score_type=='r2':
-                        if output[8]<self.dcmc_thres:
-                            list_to_remove.append((i,j))
+                    if output[0] < self.dcmc_thres:
+                        list_to_remove.append((i,j))
                 else:
                     continue
 
@@ -228,6 +200,10 @@ class CMCMap:
             ch[i].remove(j)
             self.adj_matrix[i,j]=0
 
+        print(
+            f'[multiDCMC] Edge checks complete; removed {len(list_to_remove)} edges.',
+            flush=True,
+        )
         return ch
 
 def find_longest_path(adj_matrix, i, j):
@@ -264,5 +240,3 @@ def find_longest_path(adj_matrix, i, j):
         return True, longest_path  # Return the longest valid path
     else:
         return False, None  # No valid path found
-
-
