@@ -5,3 +5,4 @@ test_distance.py
 .vscode
 __pycache__
 .png
+/data_files/data/gen/
