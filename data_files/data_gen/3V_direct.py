@@ -20,7 +20,7 @@ import pandas as pd
 import argparse
 parser=argparse.ArgumentParser("Generate 3V system data")
 parser.add_argument('--seed', type=int, default=97, help='random seed, for initial conditions')
-parser.add_argument('--L', type=int, default=1000, help='length of time series')
+parser.add_argument('--L', type=int, default=10000, help='length of time series')
 parser.add_argument('--noiseType', type=str, default='None', help='type of noise. Options: gNoise, lpNoise, or None')
 parser.add_argument('--noiseInjectType', type=str, default='add', help='type of noise injection. Options: add, mult, both')
 parser.add_argument('--noiseLevel', type=float, default=2e-2, help='noise level')
@@ -41,8 +41,8 @@ Ry = 3.78
 Rz = 3.72
 
 # Interations/Coupling strength
-Axy=0.4
-Ayz=0.4
+Axy=0.35
+Ayz=0.35
 
 flag_rerun=True # to start running
 while(flag_rerun):

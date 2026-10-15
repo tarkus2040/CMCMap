@@ -17,7 +17,7 @@ import argparse
 parser=argparse.ArgumentParser("Generate 3V system data")
 parser.add_argument('--seed', type=int, default=97, help='random seed, for initial conditions')
 parser.add_argument('--L', type=int, default=10000, help='length of time series')
-parser.add_argument('--noiseType', type=str, default='lpNoise', help='type of noise. Options: gNoise, lpNoise, or None')
+parser.add_argument('--noiseType', type=str, default='None', help='type of noise. Options: gNoise, lpNoise, or None')
 parser.add_argument('--noiseInjectType', type=str, default='add', help='type of noise injection. Options: add, mult, both')
 parser.add_argument('--noiseLevel', type=float, default=2e-2, help='noise level')
 args=parser.parse_args()

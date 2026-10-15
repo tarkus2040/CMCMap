@@ -12,18 +12,18 @@ from utils.CMCMap import CMCMap
 import argparse
 parser = argparse.ArgumentParser("single experiment of CMCMap on simulated data")
 parser.add_argument('--data_dir', type=str, default='data_files/data/gen')
-parser.add_argument('--causality_type', type=str, default='4V_both_noCycle', help='Options: 3V_direct, 3V_indirect, 3V_both_Cycle, 3V_both_noCycle, 4V_direct, 4V_indirect, 4V_both_Cycle, 4V_both_noCycle')
+parser.add_argument('--causality_type', type=str, default='3V_CMC4', help='Options: 3V_direct, 3V_indirect, 3V_both_Cycle, 3V_both_noCycle, 4V_direct, 4V_indirect, 4V_both_Cycle, 4V_both_noCycle')
 
 parser.add_argument('--seed', type=int, default=197, help='random seed, for sampling a random start point for input time series')
-parser.add_argument('--L', type=int, default=4000, help='length of input time series')
+parser.add_argument('--L', type=int, default=2000, help='length of input time series')
 
 parser.add_argument('--noiseType', type=str, default='None', help='type of noise. Options: gNoise, lpNoise, or None')
 parser.add_argument('--noiseInjectType', type=str, default='add', help='type of noise injection. Options: add, mult, both')
 parser.add_argument('--noiseLevel', type=float, default=1e-2, help='noise level')
 
-parser.add_argument('--tau', type=int, default=2, help="Cross mapping tau-lag")
-parser.add_argument('--emd', type=int, default=6, help="Cross mapping embedding dimension")
-parser.add_argument('--knn', type=int, default=10, help="Number of nearest neighbors")
+parser.add_argument('--tau', type=int, default=1, help="Cross mapping tau-lag")
+parser.add_argument('--emd', type=int, default=3, help="Cross mapping embedding dimension")
+parser.add_argument('--knn', type=int, default=4, help="Number of nearest neighbors")
 parser.add_argument('--kNN_model', type=str, default='vanilla', choices=['PCA', 'vanilla'])
 parser.add_argument('--pca_dim', type=int, default=3, help="Number of PCA components")
 

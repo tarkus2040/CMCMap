@@ -16,10 +16,6 @@ class CMCMap:
         self.tau = tau # time delay for time delay embedding
         self.emd = emd
 
-        if not 0 <= bivCMC_thres <= 1:
-            raise ValueError('bivCMC_thres must be between 0 and 1')
-        if not 0 <= dcmc_thres <= 1:
-            raise ValueError('dcmc_thres must be between 0 and 1')
         self.bivCMC_thres = bivCMC_thres
         self.dcmc_thres = dcmc_thres # threshold for DCMC edge removal
 

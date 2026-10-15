@@ -6,3 +6,4 @@ test_distance.py
 __pycache__
 .png
 /data_files/data/gen/
+.csv
