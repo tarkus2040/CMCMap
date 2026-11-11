@@ -43,10 +43,10 @@ Rz=3.78
 Ry=3.72
 
 # Interations/Coupling strength
-Ayx=0.35
-Axw=0.35
-Awz=0.35
-Azy=0.35
+Ayx=0.4
+Axw=0.4
+Awz=0.4
+Azy=0.4
 
 flag_rerun=True # to start running
 while(flag_rerun):
@@ -156,11 +156,11 @@ Rz=3.78
 Ry=3.72
 
 # Interations/Coupling strength
-Ayx=0.35
-Axw=0.35
-Axz=0.35
-Awy=0.35
-Azy=0.35
+Ayx=0.4
+Axw=0.4
+Axz=0.4
+Awy=0.4
+Azy=0.4
 
 flag_rerun=True # to start running
 while(flag_rerun):
@@ -270,11 +270,11 @@ Rz=3.78
 Ry=3.72
 
 # Interations/Coupling strength
-Ayx=0.35
-Axw=0.35
-Awz=0.35
-Awy=0.35
-Azy=0.35
+Ayx=0.4
+Axw=0.4
+Awz=0.4
+Awy=0.4
+Azy=0.4
 
 flag_rerun=True # to start running
 while(flag_rerun):

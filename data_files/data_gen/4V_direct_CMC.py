@@ -41,9 +41,9 @@ Ry=3.72
 Rz=3.7
 
 # Interations/Coupling strength
-Awx=0.35
-Axy=0.35
-Ayz=0.35
+Awx=0.4
+Axy=0.4
+Ayz=0.4
 
 flag_rerun=True # to start running
 while(flag_rerun):

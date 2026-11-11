@@ -12,14 +12,14 @@ from utils.CMCMap import CMCMap
 import argparse
 parser = argparse.ArgumentParser("single experiment of CMCMap on simulated data")
 parser.add_argument('--data_dir', type=str, default='data_files/data/gen')
-parser.add_argument('--causality_type', type=str, default='3V_CMC4', help='Options: 3V_direct, 3V_indirect, 3V_both_Cycle, 3V_both_noCycle, 4V_direct, 4V_indirect, 4V_both_Cycle, 4V_both_noCycle')
+parser.add_argument('--causality_type', type=str, default='4V_both_Cycle', help='Options: 3V_direct, 3V_indirect, 3V_both_Cycle_CMC, 3V_both_noCycle, 4V_direct, 4V_indirect, 4V_both_Cycle_CMC, 4V_both_noCycle')
 
 parser.add_argument('--seed', type=int, default=197, help='random seed, for sampling a random start point for input time series')
-parser.add_argument('--L', type=int, default=2000, help='length of input time series')
+parser.add_argument('--L', type=int, default=1000, help='length of input time series')
 
 parser.add_argument('--noiseType', type=str, default='None', help='type of noise. Options: gNoise, lpNoise, or None')
 parser.add_argument('--noiseInjectType', type=str, default='add', help='type of noise injection. Options: add, mult, both')
-parser.add_argument('--noiseLevel', type=float, default=1e-2, help='noise level')
+parser.add_argument('--noiseLevel', type=float, default=0.003, help='noise level')
 
 parser.add_argument('--tau', type=int, default=1, help="Cross mapping tau-lag")
 parser.add_argument('--emd', type=int, default=3, help="Cross mapping embedding dimension")
@@ -27,10 +27,24 @@ parser.add_argument('--knn', type=int, default=4, help="Number of nearest neighb
 parser.add_argument('--kNN_model', type=str, default='vanilla', choices=['PCA', 'vanilla'])
 parser.add_argument('--pca_dim', type=int, default=3, help="Number of PCA components")
 
-parser.add_argument('--bivCMC_thres', type=float, default=0.5, help="Minimum CMC score for creating a candidate edge")
+parser.add_argument('--bivCMC_thres', type=float, default=0.1, help="Minimum CMC score for creating a candidate edge")
 parser.add_argument('--dcmc_thres', type=float, default=0.5, help="Minimum DCMC score for retaining a direct edge")
 
 args = parser.parse_args()
+
+def format_cmc_phase1_stats(stats):
+    return '\n'.join(
+        f'{key}: score_cause_to_effect={scores[0]}, score_effect_to_cause={scores[1]}'
+        for key, scores in stats.items()
+    )
+
+
+def format_cmc_phase2_stats(stats):
+    return '\n'.join(
+        f'{key}: direct_score_cause_to_effect={scores[0]}'
+        for key, scores in stats.items()
+    )
+
 
 # set seeds
 random.seed(args.seed)
@@ -104,9 +118,9 @@ for file_name in file_names:
     print('Phase 1 stats (CMC):')
     print(model.phase1_stats)
     with open(file_dir + '_phase1_stats.txt', 'w') as f:
-        f.write(str(model.phase1_stats))
+        f.write(format_cmc_phase1_stats(model.phase1_stats))
 
     print('Phase 2 stats (multiDCMC):')
     print(model.phase2_stats)
     with open(file_dir + '_phase2_stats.txt', 'w') as f:
-        f.write(str(model.phase2_stats))
+        f.write(format_cmc_phase2_stats(model.phase2_stats))

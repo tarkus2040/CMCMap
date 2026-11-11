@@ -13,7 +13,7 @@ from utils.causal_simplex import PCM_simplex
 import argparse
 parser = argparse.ArgumentParser("single experiment of PCM on synthetic data")
 parser.add_argument('--data_dir', type=str, default='data_files/data/gen')
-parser.add_argument('--causality_type', type=str, default='3V_direct_CMC', help='Options: 3V_direct, 3V_indirect, 3V_both_Cycle, 3V_both_noCycle, 4V_direct, 4V_indirect, 4V_both_Cycle, 4V_both_noCycle')
+parser.add_argument('--causality_type', type=str, default='4V_direct', help='Options: 3V_direct, 3V_indirect, 3V_both_Cycle, 3V_both_noCycle, 4V_direct, 4V_indirect, 4V_both_Cycle, 4V_both_noCycle')
 
 parser.add_argument('--seed', type=int, default=97, help='random seed, for sampling a random start point for input time series')
 
@@ -31,7 +31,7 @@ parser.add_argument('--score_type', type=str, default='corr', help="Options are 
 parser.add_argument('--pcm_thres', type=float, default=0.45, help="Threshold for PCM")
 
 # name of cause and effect (each is single variable, the rest are all treated as conditions)
-parser.add_argument('--cause', type=str, default='Y')
+parser.add_argument('--cause', type=str, default='W')
 parser.add_argument('--effect', type=str, default='Z')
 
 args=parser.parse_args()
